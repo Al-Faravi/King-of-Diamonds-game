@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>♦ King of Diamonds</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #e8cb7a;
+    --gold-dark: #8a6d2a;
+    --red: #c0392b;
+    --red-dark: #7b241c;
+    --bg: #0a0a0f;
+    --bg2: #10101a;
+    --bg3: #181825;
+    --surface: #1e1e30;
+    --surface2: #252538;
+    --text: #e8e0d0;
+    --text2: #a09888;
+    --text3: #6a6258;
+    --border: rgba(201,168,76,0.2);
+    --border2: rgba(201,168,76,0.4);
+    --danger: #e74c3c;
+    --safe: #27ae60;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Crimson Text', Georgia, serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(201,168,76,0.04) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 40% at 0% 100%, rgba(192,57,43,0.04) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .card-bg {
+    position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0;
+  }
+  .card-bg::before, .card-bg::after {
+    content: '♦'; position: absolute; font-size: 400px; opacity: 0.015;
+    color: var(--gold); font-family: serif;
+  }
+  .card-bg::before { top: -80px; right: -80px; transform: rotate(15deg); }
+  .card-bg::after  { bottom: -80px; left: -80px; transform: rotate(-15deg); font-size: 300px; }
+
+  #app {
+    position: relative; z-index: 1; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 24px;
+  }
+
+  .screen { width: 100%; max-width: 640px; display: none; flex-direction: column; align-items: center; gap: 20px; }
+  .screen.active { display: flex; }
+
+  /* ── Typography ─────────────────────────────────── */
+  .diamond-header { text-align: center; margin-bottom: 4px; }
+
+  .diamond-suit {
+    font-size: 72px; color: var(--gold); line-height: 1;
+    text-shadow: 0 0 40px rgba(201,168,76,0.3);
+    display: block; margin-bottom: 8px;
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%,100% { text-shadow: 0 0 20px rgba(201,168,76,0.2); }
+    50%      { text-shadow: 0 0 50px rgba(201,168,76,0.5), 0 0 80px rgba(201,168,76,0.2); }
+  }
+
+  h1 {
+    font-family: 'Cinzel', serif; font-size: 32px; font-weight: 700;
+    letter-spacing: 0.12em; color: var(--gold); text-transform: uppercase;
+  }
+  h2 {
+    font-family: 'Cinzel', serif; font-size: 18px; font-weight: 600;
+    letter-spacing: 0.08em; color: var(--gold-light); text-transform: uppercase;
+  }
+  .subtitle {
+    font-family: 'Crimson Text', serif; font-style: italic;
+    color: var(--text2); font-size: 16px; letter-spacing: 0.05em;
+  }
+
+  /* ── Panels ─────────────────────────────────────── */
+  .card-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px; width: 100%;
+    position: relative; overflow: hidden;
+  }
+  .card-panel::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  /* ── Buttons ────────────────────────────────────── */
+  .btn {
+    font-family: 'Cinzel', serif; font-size: 14px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 14px 32px; border: none; border-radius: 8px;
+    cursor: pointer; transition: all 0.2s; width: 100%;
+  }
+  .btn-gold {
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold), var(--gold-light));
+    color: #1a1408;
+  }
+  .btn-gold:hover  { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 8px 24px rgba(201,168,76,0.3); }
+  .btn-gold:active { transform: translateY(0); }
+  .btn-gold:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-outline {
+    background: transparent; color: var(--gold); border: 1px solid var(--border2);
+  }
+  .btn-outline:hover { background: rgba(201,168,76,0.08); border-color: var(--gold); }
+  .btn-sm { padding: 10px 20px; font-size: 12px; width: auto; }
+
+  /* ── Inputs ─────────────────────────────────────── */
+  .input-group { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .input-label {
+    font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: 0.12em;
+    color: var(--text2); text-transform: uppercase;
+  }
+  input[type="text"], input[type="number"] {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 20px; padding: 14px 18px; width: 100%;
+    outline: none; transition: border-color 0.2s; text-align: center; letter-spacing: 0.08em;
+  }
+  input[type="text"]:focus, input[type="number"]:focus {
+    border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,168,76,0.1);
+  }
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 4px;
+    background: var(--surface2); border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 22px; height: 22px;
+    border-radius: 50%; background: var(--gold); cursor: pointer;
+    box-shadow: 0 0 8px rgba(201,168,76,0.5);
+  }
+
+  /* ── Divider ────────────────────────────────────── */
+  .divider {
+    display: flex; align-items: center; gap: 16px; width: 100%;
+    color: var(--text3); font-size: 13px;
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ── Game code display ──────────────────────────── */
+  .game-code-display {
+    font-family: 'JetBrains Mono', monospace; font-size: 40px; font-weight: 500;
+    letter-spacing: 0.25em; color: var(--gold); text-align: center;
+    background: var(--bg2); border: 2px dashed var(--border2);
+    border-radius: 12px; padding: 24px; width: 100%;
+    text-shadow: 0 0 20px rgba(201,168,76,0.4);
+  }
+
+  /* ── Player list ────────────────────────────────── */
+  .player-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .player-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px;
+    font-family: 'Cinzel', serif; font-size: 13px; transition: all 0.3s;
+  }
+  .player-item.host  { border-color: var(--gold); }
+  .player-item.elim  { opacity: 0.4; text-decoration: line-through; }
+
+  .player-badge {
+    font-size: 10px; padding: 3px 8px; border-radius: 4px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .badge-host    { background: rgba(201,168,76,0.15); color: var(--gold); border: 1px solid rgba(201,168,76,0.3); }
+  .badge-ready   { background: rgba(39,174,96,0.15);  color: #2ecc71;    border: 1px solid rgba(39,174,96,0.3); }
+  .badge-waiting { background: rgba(160,152,136,0.1); color: var(--text3); border: 1px solid var(--border); }
+  .badge-out     { background: rgba(192,57,43,0.08);  color: var(--red);  border: 1px solid rgba(192,57,43,0.2); }
+  .badge-ai      { background: rgba(100,100,200,0.1); color: #8888ff;    border: 1px solid rgba(100,100,200,0.3); }
+
+  /* ── Score bar ──────────────────────────────────── */
+  .score-bar-container { display: flex; align-items: center; gap: 8px; width: 100%; }
+  .score-bar-track { flex: 1; height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .score-bar-fill  { height: 100%; border-radius: 2px; transition: width 0.5s ease; background: var(--gold); }
+  .score-bar-fill.danger { background: var(--danger); }
+  .score-display { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text2); }
+  .score-display.danger { color: var(--danger); }
+
+  /* ── Timer ──────────────────────────────────────── */
+  .timer-ring { position: relative; display: flex; align-items: center; justify-content: center; }
+  .timer-svg { transform: rotate(-90deg); }
+  .timer-track { fill: none; stroke: var(--surface2); stroke-width: 4; }
+  .timer-progress {
+    fill: none; stroke: var(--gold); stroke-width: 4; stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear, stroke 0.3s;
+  }
+  .timer-text {
+    position: absolute; font-family: 'Cinzel', serif; font-size: 18px;
+    font-weight: 700; color: var(--gold);
+  }
+
+  /* ── Submit area ────────────────────────────────── */
+  .submit-area {
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+    width: 100%; padding: 24px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px;
+  }
+  .number-input-big {
+    font-family: 'JetBrains Mono', monospace; font-size: 64px; font-weight: 500;
+    color: var(--gold); text-align: center; background: transparent;
+    border: none; border-bottom: 2px solid var(--border2); width: 200px;
+    outline: none; padding: 8px; transition: border-color 0.2s;
+  }
+  .number-input-big:focus { border-color: var(--gold); }
+
+  /* ── Rules box ──────────────────────────────────── */
+  .rules-box {
+    background: rgba(192,57,43,0.05); border: 1px solid rgba(192,57,43,0.2);
+    border-radius: 8px; padding: 16px; width: 100%;
+    font-size: 14px; color: var(--text2); line-height: 1.7;
+  }
+  .rules-box h3 {
+    font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: 0.12em;
+    color: var(--red); text-transform: uppercase; margin-bottom: 10px;
+  }
+  .rules-box ul { padding-left: 16px; }
+  .rules-box li { margin-bottom: 6px; }
+
+  .active-rules-box {
+    background: rgba(201,168,76,0.05); border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 8px; padding: 16px; width: 100%;
+    font-size: 14px; color: var(--text2); line-height: 1.7; display: none;
+  }
+  .active-rules-box h3 {
+    font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: 0.12em;
+    color: var(--gold); text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  /* ── New rule notification ─────────────────────── */
+  .new-rule-banner {
+    background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.5);
+    border-radius: 8px; padding: 14px 18px; width: 100%; text-align: center;
+    font-family: 'Cinzel', serif; font-size: 13px; color: #e74c3c;
+    letter-spacing: 0.08em; display: none;
+    animation: flash-in 0.5s ease;
+  }
+  @keyframes flash-in {
+    0%   { opacity: 0; transform: scale(0.95); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* ── Round info ─────────────────────────────────── */
+  .round-info { text-align: center; padding: 16px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; width: 100%; }
+  .round-number { font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: 0.15em; color: var(--text3); text-transform: uppercase; margin-bottom: 4px; }
+  .round-value  { font-family: 'JetBrains Mono', monospace; font-size: 28px; color: var(--gold); }
+
+  /* ── Results ────────────────────────────────────── */
+  .target-number { text-align: center; font-family: 'JetBrains Mono', monospace; }
+  .target-number .label { font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: 0.12em; color: var(--text3); text-transform: uppercase; margin-bottom: 4px; }
+  .target-number .value { font-size: 36px; color: var(--gold-light); }
+  .target-number .calc  { font-size: 13px; color: var(--text3); margin-top: 4px; }
+
+  .results-table { width: 100%; border-collapse: collapse; }
+  .results-table th {
+    font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: 0.12em;
+    color: var(--text3); text-transform: uppercase; padding: 8px 12px;
+    text-align: left; border-bottom: 1px solid var(--border);
+  }
+  .results-table td {
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--text);
+    padding: 10px 12px; border-bottom: 1px solid rgba(201,168,76,0.06);
+  }
+  .results-table tr.winner   td { color: var(--gold);  background: rgba(201,168,76,0.04); }
+  .results-table tr.elim     td { color: var(--text3); }
+  .results-table tr.no-win   td { color: var(--text3); font-style: italic; }
+
+  /* ── Announcement ───────────────────────────────── */
+  .announcement {
+    text-align: center; padding: 18px; border-radius: 12px;
+    width: 100%; font-family: 'Cinzel', serif;
+  }
+  .announcement.win  { background: rgba(39,174,96,0.08); border: 1px solid rgba(39,174,96,0.3); color: #2ecc71; }
+  .announcement.lose { background: rgba(231,76,60,0.08); border: 1px solid rgba(231,76,60,0.3); color: #e74c3c; }
+  .announcement h2   { font-size: 15px; letter-spacing: 0.15em; margin-bottom: 6px; }
+  .announcement p    { font-family: 'Crimson Text', serif; font-size: 14px; color: var(--text2); font-style: italic; }
+
+  /* ── Waiting indicator ──────────────────────────── */
+  .waiting-indicator {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--text2); font-family: 'Crimson Text', serif;
+    font-style: italic; font-size: 15px;
+  }
+  .dot-anim span { display: inline-block; animation: dot-bounce 1.2s ease-in-out infinite; color: var(--gold); }
+  .dot-anim span:nth-child(2) { animation-delay: 0.2s; }
+  .dot-anim span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot-bounce { 0%,80%,100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
+
+  /* ── Info chip ──────────────────────────────────── */
+  .info-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 20px;
+    padding: 6px 14px; font-family: 'Cinzel', serif; font-size: 11px;
+    letter-spacing: 0.08em; color: var(--text2); text-transform: uppercase;
+  }
+  .info-chip .diamond { color: var(--gold); font-size: 12px; }
+
+  /* ── Submitted badge ────────────────────────────── */
+  .submitted-badge {
+    display: inline-block; background: rgba(39,174,96,0.15); color: #2ecc71;
+    border: 1px solid rgba(39,174,96,0.3); padding: 4px 12px; border-radius: 4px;
+    font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* ── Log box ────────────────────────────────────── */
+  .log-box {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; width: 100%; max-height: 160px; overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--text3); line-height: 1.8;
+  }
+  .log-entry { color: var(--text2); }
+  .log-entry.important { color: var(--gold); }
+  .log-entry.danger    { color: var(--danger); }
+
+  /* ── Toast ──────────────────────────────────────── */
+  .toast {
+    position: fixed; top: 20px; right: 20px; background: var(--surface);
+    border: 1px solid var(--border2); border-radius: 8px; padding: 12px 20px;
+    font-family: 'Cinzel', serif; font-size: 13px; color: var(--gold);
+    z-index: 1000; transform: translateX(200%); transition: transform 0.3s ease;
+    max-width: 280px;
+  }
+  .toast.show { transform: translateX(0); }
+  .toast.error { color: var(--danger); border-color: rgba(231,76,60,0.5); }
+
+  /* ── Final screen ───────────────────────────────── */
+  .final-screen { text-align: center; gap: 20px; }
+  .trophy-display { font-size: 80px; animation: float 3s ease-in-out infinite; }
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+
+  /* ── Misc ───────────────────────────────────────── */
+  .highlight { color: var(--gold); }
+  .flex-row { display: flex; gap: 12px; width: 100%; }
+  .flex-row > * { flex: 1; }
+  .acid-warning { display: flex; align-items: center; gap: 8px; font-family: 'Crimson Text', serif; font-style: italic; font-size: 13px; color: var(--text3); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg2); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="card-bg"></div>
+<div id="app">
+
+  <!-- ══════════════════════════════════════════════ LOBBY ══ -->
+  <div class="screen active" id="screen-lobby">
+    <div class="diamond-header">
+      <span class="diamond-suit">♦</span>
+      <h1>King of Diamonds</h1>
+      <p class="subtitle">Beauty Contest · Keynesian Game Theory</p>
+    </div>
+
+    <div class="card-panel" style="display:flex;flex-direction:column;gap:20px;">
+      <div class="input-group">
+        <span class="input-label">Your Name</span>
+        <input type="text" id="playerName" placeholder="Enter name" maxlength="20" />
+      </div>
+      <button class="btn btn-gold" onclick="createGame()">♦ Create New Game</button>
+      <div class="divider">or join existing</div>
+      <div class="input-group">
+        <span class="input-label">Game Code</span>
+        <input type="text" id="joinCode" placeholder="ENTER CODE" maxlength="6" style="text-transform:uppercase;" />
+      </div>
+      <button class="btn btn-outline" onclick="joinGame()">Enter Room</button>
+    </div>
+
+    <div class="rules-box">
+      <h3>♦ Rules Summary</h3>
+      <ul>
+        <li>Choose a number 0–100 each round</li>
+        <li>Target = 80% of the group average</li>
+        <li>Closest to target wins; others lose 1 point</li>
+        <li>Reach –10 points → eliminated with aqua regia</li>
+        <li><strong class="highlight">Rule A</strong> (after 1st elim): Same number = both invalid –1</li>
+        <li><strong class="highlight">Rule B</strong> (after 2nd elim): Exact target match = others –2</li>
+        <li><strong class="highlight">Rule C</strong> (after 3rd elim / 2 players): 100 beats 0</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ WAITING ROOM ══ -->
+  <div class="screen" id="screen-waiting">
+    <div class="diamond-header">
+      <span class="diamond-suit">♦</span>
+      <h2>Waiting Room</h2>
+      <p class="subtitle">Share the code with other players</p>
+    </div>
+
+    <div class="card-panel" style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+      <div class="round-number">Game Code</div>
+      <div class="game-code-display" id="displayCode">------</div>
+      <button class="btn btn-sm btn-outline" onclick="copyCode()" style="width:auto;">Copy Code</button>
+    </div>
+
+    <div class="card-panel" style="display:flex;flex-direction:column;gap:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="font-size:14px;">Players</h2>
+        <span class="info-chip"><span class="diamond">♦</span><span id="playerCountText">1/5</span></span>
+      </div>
+      <div class="player-list" id="waitingPlayerList"></div>
+    </div>
+
+    <div id="hostControls" style="width:100%;display:none;flex-direction:column;gap:12px;">
+      <div class="input-group">
+        <span class="input-label">AI Players (fill empty slots)</span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <input type="range" id="aiCount" min="0" max="4" value="0" step="1"
+                 oninput="document.getElementById('aiCountDisplay').textContent=this.value" style="flex:1;" />
+          <span class="round-value" id="aiCountDisplay" style="font-size:18px;min-width:16px;">0</span>
+        </div>
+      </div>
+      <button class="btn btn-gold" id="startBtn" onclick="startGame()">Start Game ♦</button>
+    </div>
+
+    <div id="guestWaiting" style="display:none;">
+      <div class="waiting-indicator">
+        Waiting for host to start
+        <span class="dot-anim"><span>.</span><span>.</span><span>.</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ GAME ══ -->
+  <div class="screen" id="screen-game">
+    <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+      <div>
+        <span class="info-chip"><span class="diamond">♦</span> ROUND <span id="roundDisplay">1</span></span>
+      </div>
+      <div class="timer-ring" id="timerContainer">
+        <svg class="timer-svg" width="60" height="60" viewBox="0 0 60 60">
+          <circle class="timer-track"    cx="30" cy="30" r="26"/>
+          <circle class="timer-progress" cx="30" cy="30" r="26" id="timerCircle"
+            stroke-dasharray="163.36" stroke-dashoffset="0"/>
+        </svg>
+        <span class="timer-text" id="timerText">—</span>
+      </div>
+    </div>
+
+    <!-- New rule banner (shown when rule unlocked) -->
+    <div class="new-rule-banner" id="newRuleBanner"></div>
+
+    <!-- Active rules -->
+    <div class="active-rules-box" id="activeRulesBox">
+      <h3>⚡ Active Special Rules</h3>
+      <ul id="activeRulesList" style="padding-left:16px;line-height:1.8;"></ul>
+    </div>
+
+    <div class="card-panel" style="display:flex;flex-direction:column;gap:12px;">
+      <div class="player-list" id="gamePlayerList"></div>
+    </div>
+
+    <!-- Submit area -->
+    <div class="submit-area" id="submitArea">
+      <div class="round-number">Your Number</div>
+      <input type="number" class="number-input-big" id="myNumber" min="0" max="100" placeholder="?" />
+      <input type="range" min="0" max="100" value="50" id="numberSlider"
+             oninput="document.getElementById('myNumber').value=this.value" />
+      <button class="btn btn-gold" id="submitBtn" onclick="submitNumber()">Submit ♦</button>
+      <div class="acid-warning">♦ Aqua regia awaits at –10 points</div>
+    </div>
+
+    <!-- Submitted waiting -->
+    <div id="submittedArea" style="display:none;text-align:center;padding:20px;">
+      <span class="submitted-badge">✓ Submitted</span>
+      <div class="waiting-indicator" style="justify-content:center;margin-top:12px;">
+        Waiting for others
+        <span class="dot-anim"><span>.</span><span>.</span><span>.</span></span>
+      </div>
+    </div>
+
+    <!-- Eliminated message -->
+    <div id="eliminatedMsg" style="display:none;text-align:center;padding:20px;">
+      <div class="announcement lose">
+        <h2>💀 YOU WERE ELIMINATED</h2>
+        <p>Dissolved by aqua regia. Observe the remaining players.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ ROUND RESULT ══ -->
+  <div class="screen" id="screen-result">
+    <div class="diamond-header">
+      <h2 style="font-size:14px;color:var(--text3);">ROUND <span id="resultRoundNum">1</span> RESULTS</h2>
+    </div>
+
+    <div class="target-number">
+      <div class="label">Target Number</div>
+      <div class="value" id="resultTarget">—</div>
+      <div class="calc"  id="resultCalc">avg × 0.8</div>
+    </div>
+
+    <div class="card-panel" style="padding:0;overflow:hidden;">
+      <table class="results-table" id="resultTable">
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Number</th>
+            <th>Distance</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="resultAnnouncement"></div>
+    <div id="eliminatedAnnouncement"></div>
+    <div id="newRuleAnnouncement"></div>
+
+    <div class="log-box" id="gameLog"></div>
+
+    <button class="btn btn-gold" id="continueBtn" onclick="nextRound()" style="display:none;">
+      Continue to Round <span id="nextRoundNum">2</span> ♦
+    </button>
+    <div id="continueWaiting" style="display:none;">
+      <div class="waiting-indicator">
+        Waiting for host<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ FINAL ══ -->
+  <div class="screen final-screen" id="screen-final">
+    <div class="trophy-display" id="finalIcon">♦</div>
+    <h1 id="finalTitle">GAME CLEAR</h1>
+    <p class="subtitle" id="finalSubtitle">You survived the King of Diamonds</p>
+
+    <div class="card-panel" style="display:flex;flex-direction:column;gap:16px;">
+      <h2 style="font-size:13px;text-align:center;">Final Standings</h2>
+      <div class="player-list" id="finalPlayerList"></div>
+    </div>
+
+    <div class="log-box" id="finalLog" style="max-height:200px;"></div>
+    <button class="btn btn-gold" onclick="backToLobby()">Play Again ♦</button>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CLIENT STATE
+// ═══════════════════════════════════════════════════════════════
+const CIRCUMFERENCE = 2 * Math.PI * 26; // r=26
+
+let me = {
+  id: null,
+  name: '',
+  code: '',
+  isHost: false
+};
+
+let gameState = {
+  players: {},
+  round: 0,
+  eliminations: 0,
+  activeRules: { ruleA: false, ruleB: false, ruleC: false },
+  submitted: false,
+  submissions: {},   // playerId → true/false (whether submitted)
+  timerInterval: null,
+  timerTotal: 60
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SOCKET.IO
+// ═══════════════════════════════════════════════════════════════
+const socket = io();
+
+socket.on('connect', () => {
+  console.log('Connected to server');
+});
+
+socket.on('error', ({ msg }) => {
+  showToast(msg, true);
+});
+
+// Game created (host)
+socket.on('game_created', ({ code, playerId, players }) => {
+  me.id   = playerId;
+  me.code = code;
+  me.isHost = true;
+  gameState.players = players;
+
+  document.getElementById('displayCode').textContent = code;
+  document.getElementById('hostControls').style.display = 'flex';
+  document.getElementById('guestWaiting').style.display = 'none';
+  showScreen('waiting');
+  renderWaitingRoom();
+});
+
+// Game joined (guest)
+socket.on('game_joined', ({ code, playerId, players }) => {
+  me.id   = playerId;
+  me.code = code;
+  me.isHost = false;
+  gameState.players = players;
+
+  document.getElementById('displayCode').textContent = code;
+  document.getElementById('hostControls').style.display = 'none';
+  document.getElementById('guestWaiting').style.display = 'flex';
+  showScreen('waiting');
+  renderWaitingRoom();
+});
+
+// Lobby update
+socket.on('lobby_update', ({ players }) => {
+  gameState.players = players;
+  renderWaitingRoom();
+});
+
+// Game started
+socket.on('game_started', ({ players, round, eliminations, activeRules }) => {
+  gameState.players    = players;
+  gameState.round      = round;
+  gameState.eliminations = eliminations;
+  gameState.activeRules  = activeRules;
+  gameState.submitted  = false;
+  gameState.submissions = {};
+
+  enterGameScreen(false);
+});
+
+// Timer start (from server)
+socket.on('timer_start', ({ seconds, endsAt }) => {
+  gameState.timerTotal = seconds;
+  startClientTimer(seconds, endsAt);
+});
+
+// Player submitted
+socket.on('player_submitted', ({ playerId }) => {
+  gameState.submissions[playerId] = true;
+  renderGamePlayers();
+});
+
+// Round result
+socket.on('round_result', ({ roundResult, players, log }) => {
+  gameState.players = players;
+  gameState.eliminations = roundResult.eliminated.length > 0
+    ? gameState.eliminations + roundResult.eliminated.length
+    : gameState.eliminations;
+  clearClientTimer();
+  showRoundResult(roundResult, log);
+});
+
+// Next round started
+socket.on('round_started', ({ round, players, eliminations, activeRules, isFirstRoundAfterNewRule }) => {
+  gameState.players    = players;
+  gameState.round      = round;
+  gameState.eliminations = eliminations;
+  gameState.activeRules  = activeRules;
+  gameState.submitted  = false;
+  gameState.submissions = {};
+
+  enterGameScreen(isFirstRoundAfterNewRule);
+});
+
+// Game over
+socket.on('game_over', ({ players, roundResult, log, winner }) => {
+  gameState.players = players;
+  clearClientTimer();
+  if (roundResult) showRoundResult(roundResult, log, true);
+  else             showFinalScreen(winner, log);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// UI ACTIONS
+// ═══════════════════════════════════════════════════════════════
+function createGame() {
+  const name = document.getElementById('playerName').value.trim();
+  if (!name) { showToast('Enter your name'); return; }
+  me.name = name;
+  socket.emit('create_game', { name });
+}
+
+function joinGame() {
+  const name = document.getElementById('playerName').value.trim();
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  if (!name) { showToast('Enter your name'); return; }
+  if (!code) { showToast('Enter game code'); return; }
+  me.name = name;
+  socket.emit('join_game', { name, code });
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(me.code).then(() => showToast('Code copied!'));
+}
+
+function startGame() {
+  const aiCount = parseInt(document.getElementById('aiCount').value) || 0;
+  socket.emit('start_game', { code: me.code, playerId: me.id, aiCount });
+}
+
+function submitNumber() {
+  if (gameState.submitted) return;
+  const val = parseInt(document.getElementById('myNumber').value);
+  if (isNaN(val) || val < 0 || val > 100) {
+    showToast('Enter a number between 0 and 100');
+    return;
+  }
+  gameState.submitted = true;
+  clearClientTimer();
+
+  document.getElementById('submitArea').style.display = 'none';
+  document.getElementById('submittedArea').style.display = 'block';
+
+  socket.emit('submit_number', { code: me.code, playerId: me.id, number: val });
+}
+
+function nextRound() {
+  socket.emit('next_round', { code: me.code, playerId: me.id });
+}
+
+function backToLobby() {
+  clearClientTimer();
+  me = { id: null, name: '', code: '', isHost: false };
+  gameState = {
+    players: {}, round: 0, eliminations: 0,
+    activeRules: { ruleA: false, ruleB: false, ruleC: false },
+    submitted: false, submissions: {}, timerInterval: null, timerTotal: 60
+  };
+  document.getElementById('playerName').value = '';
+  document.getElementById('joinCode').value = '';
+  showScreen('lobby');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCREEN RENDERERS
+// ═══════════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+function renderWaitingRoom() {
+  const players = gameState.players;
+  const list = document.getElementById('waitingPlayerList');
+  list.innerHTML = '';
+
+  const humanPlayers = Object.values(players).filter(p => !p.isAI);
+  document.getElementById('playerCountText').textContent = `${humanPlayers.length}/5`;
+
+  Object.values(players).forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'player-item' + (p.isHost ? ' host' : '');
+    el.innerHTML = `
+      <span style="font-size:14px;">${p.name}</span>
+      <span class="player-badge ${p.isHost ? 'badge-host' : 'badge-ready'}">
+        ${p.isHost ? 'Host' : 'Ready'}
+      </span>`;
+    list.appendChild(el);
+  });
+}
+
+function enterGameScreen(isNewRuleRound) {
+  showScreen('game');
+
+  // Reset submit UI
+  const myPlayer = gameState.players[me.id];
+  const isEliminated = myPlayer?.eliminated;
+
+  document.getElementById('submitArea').style.display   = isEliminated ? 'none' : 'flex';
+  document.getElementById('submittedArea').style.display = 'none';
+  document.getElementById('eliminatedMsg').style.display = isEliminated ? 'block' : 'none';
+  document.getElementById('myNumber').value = '';
+  document.getElementById('numberSlider').value = 50;
+
+  document.getElementById('roundDisplay').textContent = gameState.round;
+
+  // New rule banner
+  const banner = document.getElementById('newRuleBanner');
+  if (isNewRuleRound) {
+    const rules = gameState.activeRules;
+    let msg = '⚡ NEW RULE UNLOCKED — ';
+    if (rules.ruleC)      msg += 'Rule C: 100 overrules 0';
+    else if (rules.ruleB) msg += 'Rule B: Exact match = others lose 2 pts';
+    else if (rules.ruleA) msg += 'Rule A: Duplicate numbers are invalid';
+    banner.textContent = msg;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  renderActiveRules();
+  renderGamePlayers();
+}
+
+function renderActiveRules() {
+  const r = gameState.activeRules;
+  const box  = document.getElementById('activeRulesBox');
+  const list = document.getElementById('activeRulesList');
+  const items = [];
+
+  if (r.ruleA) items.push('<li><span class="highlight">Rule A:</span> Same number chosen by 2+ players → invalid (both lose 1 pt)</li>');
+  if (r.ruleB) items.push('<li><span class="highlight">Rule B:</span> Exact target match → all others lose 2 pts</li>');
+  if (r.ruleC) items.push('<li><span class="highlight">Rule C:</span> If one player picks 0 and other picks 100 → 100 wins</li>');
+
+  if (items.length > 0) {
+    list.innerHTML = items.join('');
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+function renderGamePlayers() {
+  const plist = document.getElementById('gamePlayerList');
+  plist.innerHTML = '';
+
+  Object.values(gameState.players).forEach(p => {
+    const score   = p.score;
+    const pct     = Math.max(0, (10 + score) / 10);
+    const submitted = gameState.submissions[p.id] === true;
+    const isMe    = p.id === me.id;
+
+    const el = document.createElement('div');
+    el.className = 'player-item' + (p.eliminated ? ' elim' : '');
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex:1;">
+        <div style="min-width:90px;font-size:13px;${isMe ? 'color:var(--gold);' : ''}">
+          ${p.name}${isMe ? ' ★' : ''}${p.isAI ? ' 🤖' : ''}
+        </div>
+        <div style="flex:1;">
+          <div class="score-bar-container">
+            <div class="score-bar-track">
+              <div class="score-bar-fill ${pct < 0.4 ? 'danger' : ''}" style="width:${pct*100}%"></div>
+            </div>
+            <span class="score-display ${score <= -7 ? 'danger' : ''}" style="min-width:28px;font-size:12px;">${score}</span>
+          </div>
+        </div>
+      </div>
+      ${p.eliminated
+        ? '<span class="player-badge badge-out">Out</span>'
+        : p.isAI
+          ? (submitted ? '<span class="player-badge badge-ready">✓</span>' : '<span class="player-badge badge-ai">AI</span>')
+          : (submitted ? '<span class="player-badge badge-ready">✓</span>' : '<span class="player-badge badge-waiting">—</span>')
+      }`;
+    plist.appendChild(el);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ROUND RESULT SCREEN
+// ═══════════════════════════════════════════════════════════════
+function showRoundResult(r, log, isGameOver = false) {
+  showScreen('result');
+
+  document.getElementById('resultRoundNum').textContent = r.round;
+  document.getElementById('resultTarget').textContent   = r.target.toFixed(2);
+  document.getElementById('resultCalc').textContent     = `avg ${r.avg.toFixed(2)} × 0.8`;
+
+  // Table
+  const tbody = document.querySelector('#resultTable tbody');
+  tbody.innerHTML = '';
+  const sorted = Object.values(gameState.players).sort((a,b) => b.score - a.score);
+
+  sorted.forEach(p => {
+    const num     = r.numbers[p.id];
+    const pen     = r.penalties[p.id] || 0;
+    const isWin   = r.winner === p.id;
+    const isMe    = p.id === me.id;
+    const isDup   = r.activeRules?.ruleA && num !== undefined
+                    && Object.values(r.numbers).filter(v => v === num).length >= 2
+                    && !isWin;
+    const dist    = (num !== undefined && !isDup) ? Math.abs(num - r.target).toFixed(2) : '—';
+
+    const tr = document.createElement('tr');
+    tr.className = isWin ? 'winner' : (p.eliminated ? 'elim' : '');
+    tr.innerHTML = `
+      <td>${isWin ? '♦ ' : ''}${p.name}${isMe ? ' ★' : ''}${p.isAI ? ' 🤖' : ''}</td>
+      <td>${num !== undefined ? num : '—'}${isDup ? ' <span style="color:var(--text3);font-size:10px;">(dup)</span>' : ''}</td>
+      <td>${dist}</td>
+      <td>${p.score} ${pen > 0 ? `<span style="color:var(--danger);font-size:11px;">(-${pen})</span>` : ''}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // My announcement
+  const ann = document.getElementById('resultAnnouncement');
+  const myPlayer = gameState.players[me.id];
+  const iWon  = r.winner === me.id;
+  const myPen = r.penalties[me.id] || 0;
+
+  if (myPlayer?.eliminated && r.eliminated?.includes(me.id)) {
+    ann.innerHTML = `<div class="announcement lose"><h2>💀 YOU ARE ELIMINATED</h2><p>Dissolved by aqua regia at –10 points.</p></div>`;
+  } else if (iWon) {
+    ann.innerHTML = `<div class="announcement win"><h2>♦ YOU WIN THIS ROUND</h2><p>${r.exactMatch ? 'EXACT MATCH — others lose 2 pts!' : 'Closest to the target. No penalty.'}</p></div>`;
+  } else if (myPen > 0) {
+    const winner = gameState.players[r.winner];
+    ann.innerHTML = `<div class="announcement lose"><h2>PENALTY: –${myPen}</h2><p>${winner ? winner.name + ' won this round.' : 'No winner this round.'}</p></div>`;
+  } else if (!myPlayer?.eliminated) {
+    ann.innerHTML = `<div class="announcement win" style="border-color:rgba(201,168,76,0.3);color:var(--gold);"><h2>NO PENALTY</h2><p>You were not penalized this round.</p></div>`;
+  } else {
+    ann.innerHTML = '';
+  }
+
+  // Eliminated players
+  const elimAnn = document.getElementById('eliminatedAnnouncement');
+  if (r.eliminated && r.eliminated.length > 0) {
+    const names = r.eliminated.map(id => gameState.players[id]?.name).filter(Boolean).join(', ');
+    elimAnn.innerHTML = `<div class="announcement lose"><h2>💀 ELIMINATED</h2><p>${names} — dissolved by aqua regia at –10 points.</p></div>`;
+  } else {
+    elimAnn.innerHTML = '';
+  }
+
+  // New rule announcement
+  const newRuleAnn = document.getElementById('newRuleAnnouncement');
+  if (r.eliminated && r.eliminated.length > 0 && !isGameOver) {
+    const newElims = gameState.eliminations;
+    let ruleMsg = '';
+    if (newElims === 1) ruleMsg = '⚡ Rule A Unlocked: Duplicate numbers are now invalid!';
+    if (newElims === 2) ruleMsg = '⚡ Rule B Unlocked: Exact target match = others lose 2 pts!';
+    if (newElims === 3) ruleMsg = '⚡ Rule C Unlocked: Choosing 100 beats 0 in a 1v1!';
+    if (ruleMsg) {
+      newRuleAnn.innerHTML = `<div class="announcement lose" style="border-color:rgba(231,76,60,0.6);"><h2>${ruleMsg}</h2><p>Next round has a 5-minute timer to adapt.</p></div>`;
+    } else {
+      newRuleAnn.innerHTML = '';
+    }
+  } else {
+    newRuleAnn.innerHTML = '';
+  }
+
+  // Log
+  const logBox = document.getElementById('gameLog');
+  if (log) {
+    logBox.innerHTML = log.slice(-10).map(entry => {
+      const cls = entry.includes('💀') ? 'danger' : entry.includes('★') || entry.includes('EXACT') ? 'important' : '';
+      return `<div class="log-entry ${cls}">${entry}</div>`;
+    }).join('');
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  // Continue button (host only; if game over, show final after brief delay)
+  document.getElementById('nextRoundNum').textContent = gameState.round + 1;
+
+  if (isGameOver) {
+    document.getElementById('continueBtn').style.display = 'none';
+    document.getElementById('continueWaiting').style.display = 'none';
+    setTimeout(() => showFinalScreen(null, log), 3000);
+  } else if (me.isHost) {
+    document.getElementById('continueBtn').style.display = 'block';
+    document.getElementById('continueWaiting').style.display = 'none';
+  } else {
+    document.getElementById('continueBtn').style.display = 'none';
+    document.getElementById('continueWaiting').style.display = 'block';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FINAL SCREEN
+// ═══════════════════════════════════════════════════════════════
+function showFinalScreen(winner, log) {
+  showScreen('final');
+
+  const surviving = Object.values(gameState.players).filter(p => !p.eliminated);
+  const w = winner || surviving[0];
+  const isMe = w && w.id === me.id;
+
+  document.getElementById('finalIcon').textContent    = isMe ? '♦' : '💀';
+  document.getElementById('finalTitle').textContent   = isMe ? 'GAME CLEAR' : 'GAME OVER';
+  document.getElementById('finalSubtitle').textContent = isMe
+    ? 'You survived the King of Diamonds'
+    : (w ? `${w.name} survived the King of Diamonds` : 'No survivors');
+
+  const sorted = Object.values(gameState.players).sort((a,b) => b.score - a.score);
+  const flist  = document.getElementById('finalPlayerList');
+  flist.innerHTML = '';
+
+  sorted.forEach(p => {
+    const survived = !p.eliminated;
+    const el = document.createElement('div');
+    el.className = 'player-item' + (survived ? ' host' : ' elim');
+    el.innerHTML = `
+      <span style="font-size:14px;">${survived ? '♦ ' : ''}${p.name}${p.isAI ? ' 🤖' : ''}</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="score-display ${p.score <= -10 ? 'danger' : ''}">${p.score}</span>
+        <span class="player-badge ${survived ? 'badge-host' : 'badge-out'}">${survived ? 'Survived' : 'Dissolved'}</span>
+      </div>`;
+    flist.appendChild(el);
+  });
+
+  if (log) {
+    const finalLog = document.getElementById('finalLog');
+    finalLog.innerHTML = log.map(entry => {
+      const cls = entry.includes('💀') ? 'danger' : entry.includes('★') ? 'important' : '';
+      return `<div class="log-entry ${cls}">${entry}</div>`;
+    }).join('');
+    finalLog.scrollTop = finalLog.scrollHeight;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLIENT-SIDE TIMER  (synced with server endsAt timestamp)
+// ═══════════════════════════════════════════════════════════════
+function startClientTimer(totalSeconds, endsAt) {
+  clearClientTimer();
+
+  function tick() {
+    const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+    updateTimerUI(remaining, totalSeconds);
+    if (remaining <= 0) {
+      clearClientTimer();
+      // Auto-submit if not submitted
+      if (!gameState.submitted) {
+        const r = Math.floor(Math.random() * 101);
+        document.getElementById('myNumber').value = r;
+        submitNumber();
+      }
+    }
+  }
+
+  tick();
+  gameState.timerInterval = setInterval(tick, 500);
+}
+
+function clearClientTimer() {
+  if (gameState.timerInterval) {
+    clearInterval(gameState.timerInterval);
+    gameState.timerInterval = null;
+  }
+}
+
+function updateTimerUI(current, total) {
+  const circle = document.getElementById('timerCircle');
+  const text   = document.getElementById('timerText');
+  const ratio  = total > 0 ? current / total : 0;
+  circle.style.strokeDashoffset = CIRCUMFERENCE * (1 - ratio);
+
+  // Display
+  if (total >= 120) {
+    const m = Math.floor(current / 60);
+    const s = String(current % 60).padStart(2, '0');
+    text.textContent = `${m}:${s}`;
+  } else {
+    text.textContent = current;
+  }
+
+  if (ratio < 0.3) {
+    circle.style.stroke = '#e74c3c';
+    text.style.color    = '#e74c3c';
+  } else if (ratio < 0.5) {
+    circle.style.stroke = '#f39c12';
+    text.style.color    = '#f39c12';
+  } else {
+    circle.style.stroke = 'var(--gold)';
+    text.style.color    = 'var(--gold)';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INPUT SYNC
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('joinCode').addEventListener('input', function () {
+  this.value = this.value.toUpperCase();
+});
+
+document.getElementById('myNumber').addEventListener('input', function () {
+  const v = parseInt(this.value);
+  if (!isNaN(v) && v >= 0 && v <= 100) {
+    document.getElementById('numberSlider').value = v;
+  }
+});
+</script>
+</body>
+</html>
